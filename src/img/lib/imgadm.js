@@ -3349,8 +3349,8 @@ IMGADM.prototype.createImage = function createImage(options, callback) {
         function getVmInfo(next) {
             var opts;
             if (vmInfo.brand === 'kvm' || vmInfo.brand === 'bhyve') {
-                if (vmInfo.disks && vmInfo.disks[0]) {
-                    var disk = vmInfo.disks[0];
+                if (vmInfo.disks && vmInfo.disks[1]) {
+                    var disk = vmInfo.disks[1];
                     vmZfsFilesystemName = disk.zfs_filesystem;
 
                     if (disk.image_uuid) {
