@@ -3308,6 +3308,7 @@ IMGADM.prototype.createImage = function createImage(options, callback) {
     assert.optionalString(options.compression, 'options.compression');
     assert.optionalBool(options.incremental, 'options.incremental');
     assert.optionalString(options.prepareScript, 'options.prepareScript');
+    assert.optionalString(options.fromDisk, 'options.fromDisk');
     assert.optionalNumber(options.prepareTimeout, 'options.prepareTimeout');
     assert.optionalNumber(options.maxOriginDepth, 'options.maxOriginDepth');
     var log = self.log;
@@ -3317,6 +3318,8 @@ IMGADM.prototype.createImage = function createImage(options, callback) {
     var prepareScript = options.prepareScript;
     var prepareTimeout = options.prepareTimeout || 300;  // in seconds
     var maxOriginDepth = options.maxOriginDepth;
+    var fromDisk = options.fromDisk || null; 
+    var snapDisk;
 
     var vmInfo;
     var snapname = '@imgadm-create-pre-prepare';
@@ -3338,20 +3341,40 @@ IMGADM.prototype.createImage = function createImage(options, callback) {
                     next(new errors.VmNotFoundError(vmUuid));
                     return;
                 }
-                if (!prepareScript && vm.state !== 'stopped') {
-                    next(new errors.VmNotStoppedError(vmUuid));
-                    return;
-                }
                 vmInfo = vm;
+                // If the user specifies a non root blk device the 
+                // machine doesn't need to be stopped or have a script.
+                if (fromDisk === vmInfo.disks[0].uuid || !fromDisk) {
+                    if (!prepareScript && vm.state !== 'stopped') {
+                        next(new errors.VmNotStoppedError(vmUuid));
+                        return;
+                    }
+                }
                 next();
             });
         },
         function getVmInfo(next) {
             var opts;
             if (vmInfo.brand === 'kvm' || vmInfo.brand === 'bhyve') {
-                if (vmInfo.disks && vmInfo.disks[1]) {
-                    var disk = vmInfo.disks[1];
-                    vmZfsFilesystemName = disk.zfs_filesystem;
+                if (vmInfo.disks && vmInfo.disks[0]) {
+                    // Set snapDisk to disk0.
+                            snapDisk = vmInfo.disks[0];
+                    // Override snapDisk If user specifed --from-disk
+                    if (fromDisk != null) {
+                      for (var i = 0, len = vmInfo.disks.length; i < len; i++) {
+                        if (fromDisk === vmInfo.disks[i].uuid) {
+                          snapDisk = vmInfo.disks[i];
+                        }
+                      }
+                    }
+                    if (!snapDisk) {
+                            next(new errors.VmDiskNotFoundError(fromDisk));
+                            return;
+                    } 
+                    // We still use the root disk for manifest info.
+                    // We will override size later.
+                    var disk = vmInfo.disks[0];
+                    vmZfsFilesystemName = snapDisk.zfs_filesystem;
 
                     if (disk.image_uuid) {
                         opts = {uuid: disk.image_uuid, zpool: disk.zpool};
@@ -3518,6 +3541,10 @@ IMGADM.prototype.createImage = function createImage(options, callback) {
                 } else {
                     m.origin = originInfo.manifest.uuid;
                 }
+            }
+            // over ride image size with fromDisk.size
+            if (fromDisk) {
+              m.image_size = snapDisk.size;
             }
             logCb(format('Manifest:\n%s',
                 indent(JSON.stringify(m, null, 2))));

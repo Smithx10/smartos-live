@@ -284,6 +284,23 @@ function VmHasNoOriginError(cause, vmUuid) {
 }
 util.inherits(VmHasNoOriginError, ImgadmError);
 
+// A VM must have the provided disk uuid to use 'imgadm create --from-disk'.
+function VmDiskNotFoundError(cause, diskUuid) {
+    if (diskUuid === undefined) {
+        diskUuid = cause;
+        cause = undefined;
+    }
+    assert.string(diskUuid, 'diskUuid');
+    ImgadmError.call(this, {
+        cause: cause,
+        message: format('cannot create an image from disk: "%s". disk'
+            + 'not found', diskUuid),
+        code: 'VmDiskNotFound',
+        exitStatus: 1
+    });
+}
+util.inherits(VmDiskNotFoundError, ImgadmError);
+
 function PrepareImageError(cause, vmUuid, details) {
     if (details === undefined) {
         details = vmUuid;
@@ -797,6 +814,7 @@ module.exports = {
     VmNotFoundError: VmNotFoundError,
     VmNotStoppedError: VmNotStoppedError,
     VmHasNoOriginError: VmHasNoOriginError,
+    VmDiskNotFoundError: VmDiskNotFoundError,
     PrepareImageError: PrepareImageError,
     PrepareImageDidNotRunError: PrepareImageDidNotRunError,
     TimeoutError: TimeoutError,

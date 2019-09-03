@@ -1745,6 +1745,11 @@ CLI.prototype.do_create = function do_create(subcmd, opts, args, cb) {
             opts.compression, common.VALID_COMPRESSIONS.join('", "'))));
         return;
     }
+    if (opts.from_disk && !assertUuid(opts.fromDisk) {
+        cb(new errors.UsageError(
+            'invalid -f,--from_disk  "%s": must be a disk uuid', opts.from_disk));
+        return;
+    }
     if (opts.output_template && opts.publish) {
         cb(new errors.UsageError(
             'cannot specify both -o,--output-template and -p,--publish'));
@@ -1844,6 +1849,7 @@ CLI.prototype.do_create = function do_create(subcmd, opts, args, cb) {
         var createOpts = {
             vmUuid: vmUuid,
             manifest: manifest,
+            fromDisk: opts.from_disk,
             compression: opts.compression,
             incremental: opts.incremental,
             prepareScript: opts.s && fs.readFileSync(opts.s, 'utf8'),
@@ -1983,6 +1989,15 @@ CLI.prototype.do_create.options = [
             + 'to it. If the basename of "PATH" is not a dir, '
             + 'then "PATH.imgmanifest" and "PATH.zfs[.EXT]" are '
             + 'created.'
+    },
+    {
+        names: ['from-disk', 'f'],
+        type: 'string',
+        helpArg: '<from>',
+        help: 'Build and image from the provided disk UUID. '
+            + 'prepare-image-script can only be used with disk[0] '
+	    + 'aka the root disk.  Building a root filesystem via '
+	    + 'chroot should not require any preperation.'
     },
     {
         names: ['compression', 'c'],
